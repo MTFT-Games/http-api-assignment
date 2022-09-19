@@ -33,6 +33,7 @@ function onRequest(request, response) {
   const parsedUrl = url.parse(request.url);
   // Remove any './' or '../' from the url and prepend the defined web dir
   const resolvedPath = parsedUrl.pathname.replaceAll('./', '').replaceAll('../', '');
+  const acceptedTypes = request.headers.accept.split(',');
 
   // Check if the requested resource is a special case
   if (specialCases[resolvedPath]) {
@@ -40,13 +41,19 @@ function onRequest(request, response) {
   } else if ((request.method === 'GET' || request.method === 'HEAD') && checkValidFile(webdir + resolvedPath)) {
     console.log("serving " + webdir + resolvedPath); //serveFile(webdir + resolvedPath, request, response);
   } else {
-    response.head
+    response.statusCode = 404;
+    
+    
+    //response.setHeader()
   }
 }
 
 http.createServer(onRequest).listen(port, () =>
   console.log(`Serving files in ${webdir} on port ${port}`));
 
+function determineType(acceptedTypes, availableTypes) {
+  const type = acceptedTypes.indexOf(acceptedTypes.find());
+}
 
 function checkValidFile(filePath) {
   try {
