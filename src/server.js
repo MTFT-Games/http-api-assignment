@@ -2,6 +2,7 @@
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
+const utilities = require('./utilities.js');
 // #endregion
 
 // #region Settings
@@ -26,55 +27,6 @@ try {
 }
 // #endregion
 
-// Helper to check if a file is accessable TODO: move to another file
-function checkValidFile(filePath) {
-  try {
-    fs.accessSync(filePath);
-  } catch (error) {
-    return false;
-  }
-  return true;
-}
-
-// Determines the appropriate content type to return based on the
-// clients accepted types and the types available for this endpoint. TODO: move to other file
-function determineType(acceptedTypes, availableTypes) {
-  // Search the clients accepted types for the first option available.
-  const type = acceptedTypes.find((element) => {
-    // Get rid of version or quality values and presume the list is already
-    // sorted by preference.
-    const testedType = element.split(';')[0];
-
-    // Check if the type in question is available
-    if (availableTypes.includes(testedType)) {
-      return true;
-    }
-
-    // Check if the type in question is a wildcard
-    if (testedType === '*/*') {
-      return true;
-    }
-
-    return false;
-  });
-
-  // Get rid of version or quality values
-  const trimmedType = type.split(';')[0];
-
-  if (trimmedType === '*/*') {
-    // If the client doesnt care, use default
-    return acceptedTypes[0];
-  }
-
-  if (trimmedType) {
-    // If a type was found, use it
-    return trimmedType;
-  }
-
-  // Indicate that there are no acceptable responses.
-  return false;
-}
-
 function jsonToXml(json) {
   let xml = '<response>';
   Object.keys(json).forEach((key) => {
@@ -90,12 +42,12 @@ function serveFile(request, response, acceptedTypes, filePath) {
   const fileExtension = filePath.substring(filePath.lastIndexOf('.'));
   let contentType;
   if (fileExtension === '.html') {
-    contentType = determineType(acceptedTypes, ['text/html', 'text/plain']);
+    contentType = utilities.determineType(acceptedTypes, ['text/html', 'text/plain']);
   } else if (fileExtension === '.css') {
-    contentType = determineType(acceptedTypes, ['text/css', 'text/plain']);
+    contentType = utilities.determineType(acceptedTypes, ['text/css', 'text/plain']);
   } else {
     // 415 code, unsupported media type
-    contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
+    contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
     response.writeHead(415, contentType);
     if (request.method === 'GET') {
       const responseJSON = {
@@ -119,7 +71,7 @@ function serveFile(request, response, acceptedTypes, filePath) {
     fs.readFile(filePath, (err, data) => {
       if (err) {
         // TODO: func for errors
-        contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
+        contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
 
         const responseJSON = {
           id: '500InternalServerError',
@@ -159,12 +111,12 @@ function onRequest(request, response) {
   // Check if the requested resource is a special case
   if (specialCases[resolvedPath]) {
     specialCases[resolvedPath](request, response, acceptedTypes, parsedUrl);
-  } else if ((request.method === 'GET' || request.method === 'HEAD') && checkValidFile(webdir + resolvedPath)) {
+  } else if ((request.method === 'GET' || request.method === 'HEAD') && utilities.checkValidFile(webdir + resolvedPath)) {
     // If a file exists at the requested path, get it.
     serveFile(request, response, acceptedTypes, webdir + resolvedPath);
   } else { // TODO Break out to a funuction to send a response.
     response.statusCode = 404;
-    const contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
+    const contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
     response.setHeader('Content-Type', contentType);
 
     if (request.method !== 'HEAD') {
