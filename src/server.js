@@ -26,11 +26,6 @@ try {
 }
 // #endregion
 
-// Struct to manage any cases that should be handled in a specific way
-const specialCases = {
-  '/': () => console.log('/ reached'), // serveFile(webdir + '/client.html'),
-};
-
 // Helper to check if a file is accessable TODO: move to another file
 function checkValidFile(filePath) {
   try {
@@ -96,29 +91,64 @@ function serveFile(request, response, acceptedTypes, filePath) {
   let contentType;
   if (fileExtension === '.html') {
     contentType = determineType(acceptedTypes, ['text/html', 'text/plain']);
+  } else if (fileExtension === '.css') {
+    contentType = determineType(acceptedTypes, ['text/css', 'text/plain']);
   } else {
     // 415 code, unsupported media type
-  }
-  response.writeHead(200, {'Content-Type': contentType});
+    contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
+    response.writeHead(415, contentType);
+    if (request.method === 'GET') {
+      const responseJSON = {
+        id: '415UnsupportedMediaType',
+        message: 'The resource you requested is of an unsupported type.',
+      };
 
-  if (request.method === 'GET'){
+      let responseContent;
+      if (contentType === 'application/xml') {
+        responseContent = jsonToXml(responseJSON);
+      } else {
+        responseContent = JSON.stringify(responseJSON);
+      }
+      response.write(responseContent);
+    }
+    return response.end();
+  }
+  response.writeHead(200, { 'Content-Type': contentType });
+
+  if (request.method === 'GET') {
     fs.readFile(filePath, (err, data) => {
       if (err) {
         // TODO: func for errors
         contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
-        // make error json
-        //convert json
-        //send and return end
+
+        const responseJSON = {
+          id: '500InternalServerError',
+          message: 'The server encountered an unexpected problem getting the resourse.',
+        };
+
+        let responseContent;
+        if (contentType === 'application/xml') {
+          responseContent = jsonToXml(responseJSON);
+        } else {
+          responseContent = JSON.stringify(responseJSON);
+        }
         response.writeHead(500, contentType);
+        response.write(responseContent);
+        return response.end();
       }
 
       response.write(data);
-      response.end();
+      return response.end();
     });
   } else {
     response.end();
   }
 }
+
+// Struct to manage any cases that should be handled in a specific way
+const specialCases = {
+  '/': (request, response, acceptedTypes) => serveFile(request, response, acceptedTypes, `${webdir}/client.html`),
+};
 
 function onRequest(request, response) {
   const parsedUrl = url.parse(request.url);
@@ -128,10 +158,10 @@ function onRequest(request, response) {
 
   // Check if the requested resource is a special case
   if (specialCases[resolvedPath]) {
-    specialCases[resolvedPath](request, response, parsedUrl);
+    specialCases[resolvedPath](request, response, acceptedTypes, parsedUrl);
   } else if ((request.method === 'GET' || request.method === 'HEAD') && checkValidFile(webdir + resolvedPath)) {
     // If a file exists at the requested path, get it.
-    console.log(`serving ${webdir}${resolvedPath}`); // serveFile(webdir + resolvedPath, request, response);
+    serveFile(request, response, acceptedTypes, webdir + resolvedPath);
   } else { // TODO Break out to a funuction to send a response.
     response.statusCode = 404;
     const contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
