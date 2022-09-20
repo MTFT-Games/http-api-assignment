@@ -92,14 +92,31 @@ function jsonToXml(json) {
 
 function serveFile(request, response, acceptedTypes, filePath) {
   // currently only supports html and css for simplicity
-  response.statusCode = 200;
-
-  const fileExtention = filePath.substring(filePath.lastIndexOf('.'));
+  const fileExtension = filePath.substring(filePath.lastIndexOf('.'));
   let contentType;
-  if (fileExtention === '.html') {
-    contentType = determineType()
+  if (fileExtension === '.html') {
+    contentType = determineType(acceptedTypes, ['text/html', 'text/plain']);
   } else {
     // 415 code, unsupported media type
+  }
+  response.writeHead(200, {'Content-Type': contentType});
+
+  if (request.method === 'GET'){
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        // TODO: func for errors
+        contentType = determineType(acceptedTypes, ['application/json', 'application/xml']);
+        // make error json
+        //convert json
+        //send and return end
+        response.writeHead(500, contentType);
+      }
+
+      response.write(data);
+      response.end();
+    });
+  } else {
+    response.end();
   }
 }
 
