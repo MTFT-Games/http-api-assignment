@@ -4,10 +4,10 @@ const fs = require('fs');
 const url = require('url');
 // #endregion
 
+// #region Settings
 // Read and parse settings file
 const settings = JSON.parse(fs.readFileSync(`${__dirname}/../settings.json`));
 
-// #region Settings
 const port = process.env.PORT || process.env.NODE_PORT || 3000;
 
 // Attempt to verify and set the webdir to serve from
@@ -90,6 +90,19 @@ function jsonToXml(json) {
   return xml;
 }
 
+function serveFile(request, response, acceptedTypes, filePath) {
+  // currently only supports html and css for simplicity
+  response.statusCode = 200;
+
+  const fileExtention = filePath.substring(filePath.lastIndexOf('.'));
+  let contentType;
+  if (fileExtention === '.html') {
+    contentType = determineType()
+  } else {
+    // 415 code, unsupported media type
+  }
+}
+
 function onRequest(request, response) {
   const parsedUrl = url.parse(request.url);
   // Remove any './' or '../' from the url and prepend the defined web dir
@@ -100,7 +113,7 @@ function onRequest(request, response) {
   if (specialCases[resolvedPath]) {
     specialCases[resolvedPath](request, response, parsedUrl);
   } else if ((request.method === 'GET' || request.method === 'HEAD') && checkValidFile(webdir + resolvedPath)) {
-    //
+    // If a file exists at the requested path, get it.
     console.log(`serving ${webdir}${resolvedPath}`); // serveFile(webdir + resolvedPath, request, response);
   } else { // TODO Break out to a funuction to send a response.
     response.statusCode = 404;
