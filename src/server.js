@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const utilities = require('./utilities.js');
+const responses = require('./responses.js');
 // #endregion
 
 // #region Settings
@@ -27,79 +28,9 @@ try {
 }
 // #endregion
 
-function jsonToXml(json) {
-  let xml = '<response>';
-  Object.keys(json).forEach((key) => {
-    xml += `<${key}>${json[key]}</${key}>`;
-  });
-  xml += '</response>';
-
-  return xml;
-}
-
-function serveFile(request, response, acceptedTypes, filePath) {
-  // currently only supports html and css for simplicity
-  const fileExtension = filePath.substring(filePath.lastIndexOf('.'));
-  let contentType;
-  if (fileExtension === '.html') {
-    contentType = utilities.determineType(acceptedTypes, ['text/html', 'text/plain']);
-  } else if (fileExtension === '.css') {
-    contentType = utilities.determineType(acceptedTypes, ['text/css', 'text/plain']);
-  } else {
-    // 415 code, unsupported media type
-    contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
-    response.writeHead(415, contentType);
-    if (request.method === 'GET') {
-      const responseJSON = {
-        id: '415UnsupportedMediaType',
-        message: 'The resource you requested is of an unsupported type.',
-      };
-
-      let responseContent;
-      if (contentType === 'application/xml') {
-        responseContent = jsonToXml(responseJSON);
-      } else {
-        responseContent = JSON.stringify(responseJSON);
-      }
-      response.write(responseContent);
-    }
-    return response.end();
-  }
-  response.writeHead(200, { 'Content-Type': contentType });
-
-  if (request.method === 'GET') {
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        // TODO: func for errors
-        contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
-
-        const responseJSON = {
-          id: '500InternalServerError',
-          message: 'The server encountered an unexpected problem getting the resourse.',
-        };
-
-        let responseContent;
-        if (contentType === 'application/xml') {
-          responseContent = jsonToXml(responseJSON);
-        } else {
-          responseContent = JSON.stringify(responseJSON);
-        }
-        response.writeHead(500, contentType);
-        response.write(responseContent);
-        return response.end();
-      }
-
-      response.write(data);
-      return response.end();
-    });
-  } else {
-    response.end();
-  }
-}
-
 // Struct to manage any cases that should be handled in a specific way
 const specialCases = {
-  '/': (request, response, acceptedTypes) => serveFile(request, response, acceptedTypes, `${webdir}/client.html`),
+  '/': (request, response, acceptedTypes) => responses.serveFile(request, response, acceptedTypes, `${webdir}/client.html`),
 };
 
 function onRequest(request, response) {
@@ -113,29 +44,16 @@ function onRequest(request, response) {
     specialCases[resolvedPath](request, response, acceptedTypes, parsedUrl);
   } else if ((request.method === 'GET' || request.method === 'HEAD') && utilities.checkValidFile(webdir + resolvedPath)) {
     // If a file exists at the requested path, get it.
-    serveFile(request, response, acceptedTypes, webdir + resolvedPath);
+    responses.serveFile(request, response, acceptedTypes, webdir + resolvedPath);
   } else { // TODO Break out to a funuction to send a response.
-    response.statusCode = 404;
-    const contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
-    response.setHeader('Content-Type', contentType);
-
-    if (request.method !== 'HEAD') {
-      const responseJSON = {
-        id: '404NotFound',
-        message: 'The page or resource you have requested does not exist.',
-      };
-
-      let responseContent;
-      if (contentType === 'application/xml') {
-        responseContent = jsonToXml(responseJSON);
-      } else {
-        responseContent = JSON.stringify(responseJSON);
-      }
-
-      response.write(responseContent);
-    }
-
-    response.end();
+    responses.sendError(
+      request,
+      response,
+      acceptedTypes,
+      404,
+      '404NotFound',
+      'The page or resource you have requested does not exist.',
+    );
   }
 }
 

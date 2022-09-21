@@ -49,4 +49,15 @@ function determineType(acceptedTypes, availableTypes) {
   return false;
 }
 
-module.exports = {checkValidFile, determineType,};
+// Helper to convert JSON to XML
+function jsonToXml(json) {
+  let xml = '<response>';
+  Object.keys(json).forEach((key) => {
+    xml += `<${key}>${json[key]}</${key}>`;
+  });
+  xml += '</response>';
+
+  return xml;
+}
+
+module.exports = { checkValidFile, determineType, jsonToXml };
