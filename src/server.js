@@ -1,7 +1,7 @@
 // #region Imports
 const http = require('http');
 const fs = require('fs');
-const url = require('url');
+const path = require('path/posix');
 const utilities = require('./utilities.js');
 const responses = require('./responses.js');
 // #endregion
@@ -31,22 +31,27 @@ try {
 // Struct to manage any cases that should be handled in a specific way
 const specialCases = {
   '/': (request, response, acceptedTypes) => responses.serveFile(request, response, acceptedTypes, `${webdir}/client.html`),
+  '/success': (request, response, acceptedTypes) => responses.sendCode(request, response, acceptedTypes, 200, null, 'Resource successfully delivered.'),
+  '/forbidden': (request, response, acceptedTypes) => responses.sendCode(request, response, acceptedTypes, 403, '403Forbidden', 'You do not have permission to access this resource.'),
+  '/internal': (request, response, acceptedTypes) => responses.sendCode(request, response, acceptedTypes, 500, '500InternalServerError', 'The server encountered an unexpected problem getting the resource.'),
+  '/notImplemented': (request, response, acceptedTypes) => responses.sendCode(request, response, acceptedTypes, 501, '501NotImplemented', 'Request method not supported.'),
+  '/badRequest': responses.badRequest,
+  '/unauthorized': responses.unauthorized,
 };
 
 function onRequest(request, response) {
-  const parsedUrl = url.parse(request.url);
-  // Remove any './' or '../' from the url and prepend the defined web dir
-  const resolvedPath = parsedUrl.pathname.replaceAll('./', '').replaceAll('../', '');
+  const parsedUrl = new URL(request.url, `http://${request.headers.host}`);
+  const resolvedPath = path.normalize(parsedUrl.pathname);
   const acceptedTypes = request.headers.accept.split(',');
 
   // Check if the requested resource is a special case
   if (specialCases[resolvedPath]) {
-    specialCases[resolvedPath](request, response, acceptedTypes, parsedUrl);
+    specialCases[resolvedPath](request, response, acceptedTypes, parsedUrl.searchParams);
   } else if ((request.method === 'GET' || request.method === 'HEAD') && utilities.checkValidFile(webdir + resolvedPath)) {
     // If a file exists at the requested path, get it.
     responses.serveFile(request, response, acceptedTypes, webdir + resolvedPath);
-  } else { // TODO Break out to a funuction to send a response.
-    responses.sendError(
+  } else {
+    responses.sendCode(
       request,
       response,
       acceptedTypes,

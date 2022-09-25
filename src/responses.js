@@ -1,16 +1,19 @@
-const utilities = require('./utilities.js');
 const fs = require('fs');
+const utilities = require('./utilities.js');
 
 // Respond with an error code and object.
-function sendError(request, response, acceptedTypes, code, id, message) {
-  const contentType = utilities.determineType(acceptedTypes, ['application/json', 'application/xml']);
+function sendCode(request, response, acceptedTypes, code, id, message) {
+  const contentType = utilities.determineType(acceptedTypes, ['application/json', 'text/xml']);
   response.writeHead(code, { 'Content-Type': contentType });
 
   if (request.method !== 'HEAD') {
-    const responseJSON = { id, message };
+    const responseJSON = { message };
+    if (id) {
+      responseJSON.id = id;
+    }
 
     let responseContent;
-    if (contentType === 'application/xml') {
+    if (contentType === 'text/xml') {
       responseContent = utilities.jsonToXml(responseJSON);
     } else {
       responseContent = JSON.stringify(responseJSON);
@@ -28,7 +31,7 @@ function serveFile(request, response, acceptedTypes, filePath) {
 
   const fileExtension = filePath.substring(filePath.lastIndexOf('.'));
 
-  // Determine available content types based on file extention. 
+  // Determine available content types based on file extention.
   let contentType;
   if (fileExtension === '.html') {
     contentType = utilities.determineType(acceptedTypes, ['text/html', 'text/plain']);
@@ -36,7 +39,7 @@ function serveFile(request, response, acceptedTypes, filePath) {
     contentType = utilities.determineType(acceptedTypes, ['text/css', 'text/plain']);
   } else {
     // 415 code, unsupported media type
-    return sendError(
+    return sendCode(
       request,
       response,
       acceptedTypes,
@@ -52,14 +55,14 @@ function serveFile(request, response, acceptedTypes, filePath) {
     fs.readFile(filePath, (err, data) => {
       if (err) {
         // The file should be checked to be sure it can be accessed before calling this function.
-        // If it now cant be read, thats an unknown error. 
-        return sendError(
+        // If it now cant be read, thats an unknown error.
+        return sendCode(
           request,
           response,
           acceptedTypes,
           500,
           '500InternalServerError',
-          'The server encountered an unexpected problem getting the resourse.',
+          'The server encountered an unexpected problem getting the resource.',
         );
       }
 
@@ -73,4 +76,50 @@ function serveFile(request, response, acceptedTypes, filePath) {
   return 1;
 }
 
-module.exports = { sendError, serveFile, };
+function badRequest(request, response, acceptedTypes, params) {
+  if (params.get('valid') === 'true') {
+    return sendCode(
+      request,
+      response,
+      acceptedTypes,
+      200,
+      null,
+      'valid param received.',
+    );
+  }
+
+  return sendCode(
+    request,
+    response,
+    acceptedTypes,
+    400,
+    '400BadRequest',
+    'This endpoint requires the "valid" query param.',
+  );
+}
+
+function unauthorized(request, response, acceptedTypes, params) {
+  if (params.get('loggedIn') === 'yes') {
+    return sendCode(
+      request,
+      response,
+      acceptedTypes,
+      200,
+      null,
+      'loggedIn param received.',
+    );
+  }
+
+  return sendCode(
+    request,
+    response,
+    acceptedTypes,
+    401,
+    '401Unauthorized',
+    'You must be logged in to access this resource.',
+  );
+}
+
+module.exports = {
+  sendCode, serveFile, badRequest, unauthorized,
+};

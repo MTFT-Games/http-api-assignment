@@ -32,6 +32,11 @@ function determineType(acceptedTypes, availableTypes) {
     return false;
   });
 
+  if (!type) {
+    // Indicate that there are no acceptable responses.
+    return false;
+  }
+
   // Get rid of version or quality values again
   const trimmedType = type.split(';')[0];
 
@@ -40,13 +45,8 @@ function determineType(acceptedTypes, availableTypes) {
     return acceptedTypes[0];
   }
 
-  if (trimmedType) {
-    // If a type was found, use it
-    return trimmedType;
-  }
-
-  // Indicate that there are no acceptable responses.
-  return false;
+  // If a type was found, use it
+  return trimmedType;
 }
 
 // Helper to convert JSON to XML
