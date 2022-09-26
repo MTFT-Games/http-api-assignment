@@ -1,7 +1,7 @@
 // #region Imports
 const http = require('http');
 const fs = require('fs');
-const path = require('path/posix');
+const path = require('path').posix;
 const utilities = require('./utilities.js');
 const responses = require('./responses.js');
 // #endregion
